@@ -19,6 +19,7 @@ dependencies = [
     "apscheduler>=3.10.4",
     "pydantic-settings>=2.4.0",
     "python-dotenv>=1.0.0",
+    "google-genai>=1.0.0",
 ]
 
 [project.optional-dependencies]

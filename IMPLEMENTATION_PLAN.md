@@ -215,6 +215,7 @@ news-agg/
 ```bash
 # AI
 ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=AIza...
 
 # News APIs (optional but recommended)
 NEWS_API_KEY=...          # newsapi.org

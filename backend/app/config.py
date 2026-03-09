@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     anthropic_api_key: str = ""
+    gemini_api_key: str = ""
     news_api_key: str = ""
     guardian_api_key: str = ""
 

@@ -3,12 +3,15 @@ import json
 import logging
 
 import anthropic
+from google import genai
+from google.genai import types
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: anthropic.Anthropic | None = None
+_anthropic_client: anthropic.Anthropic | None = None
+_gemini_client: genai.Client | None = None
 
 SYSTEM_PROMPT = """You are a news editor for a balanced, calm news service designed to combat doom-scrolling.
 
@@ -25,20 +28,43 @@ Analyze the article title and description and return ONLY valid JSON with exactl
 Return ONLY the JSON object, no markdown, no extra text."""
 
 
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    return _client
+def _get_anthropic_client() -> anthropic.Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return _anthropic_client
 
 
-def process_article(title: str, description: str) -> dict:
-    """Run a single article through the Claude AI pipeline.
+def _get_gemini_client() -> genai.Client:
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=settings.gemini_api_key)
+    return _gemini_client
 
-    Returns a dict with keys: category, sentiment_score, tldr, keep.
-    Falls back to safe defaults on any error.
-    """
-    client = _get_client()
+
+def _process_with_gemini(title: str, description: str) -> dict:
+    client = _get_gemini_client()
+    user_content = f"Title: {title}\n\nDescription: {description or '(no description)'}"
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_content,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                response_mime_type="application/json",
+            )
+        )
+        raw = response.text.strip()
+        result = json.loads(raw)
+        return _build_result(result, title)
+    except Exception as e:
+        logger.error("Gemini API error for article '%s': %s", title, e)
+        return _fallback_result(title)
+
+
+def _process_with_anthropic(title: str, description: str) -> dict:
+    client = _get_anthropic_client()
     user_content = f"Title: {title}\n\nDescription: {description or '(no description)'}"
 
     try:
@@ -50,19 +76,38 @@ def process_article(title: str, description: str) -> dict:
         )
         raw = message.content[0].text.strip()
         result = json.loads(raw)
-
-        return {
-            "category": result.get("category", "neutral"),
-            "sentiment_score": float(result.get("sentiment_score", 0.0)),
-            "tldr": result.get("tldr", title),
-            "keep": bool(result.get("keep", True)),
-        }
-    except (json.JSONDecodeError, KeyError, IndexError) as e:
-        logger.warning("Failed to parse Claude response for article '%s': %s", title, e)
-        return {"category": "neutral", "sentiment_score": 0.0, "tldr": title, "keep": True}
-    except anthropic.APIError as e:
+        return _build_result(result, title)
+    except Exception as e:
         logger.error("Claude API error for article '%s': %s", title, e)
-        return {"category": "neutral", "sentiment_score": 0.0, "tldr": title, "keep": True}
+        return _fallback_result(title)
+
+
+def _build_result(result: dict, title: str) -> dict:
+    return {
+        "category": result.get("category", "neutral"),
+        "sentiment_score": float(result.get("sentiment_score", 0.0)),
+        "tldr": result.get("tldr", title),
+        "keep": bool(result.get("keep", True)),
+    }
+
+
+def _fallback_result(title: str) -> dict:
+    return {"category": "neutral", "sentiment_score": 0.0, "tldr": title, "keep": True}
+
+
+def process_article(title: str, description: str) -> dict:
+    """Run a single article through the AI pipeline (Gemini or Claude).
+
+    Returns a dict with keys: category, sentiment_score, tldr, keep.
+    Falls back to safe defaults on any error.
+    """
+    if settings.gemini_api_key:
+        return _process_with_gemini(title, description)
+    elif settings.anthropic_api_key:
+        return _process_with_anthropic(title, description)
+    else:
+        logger.warning("No AI API key configured! Falling back to safe defaults for '%s'", title)
+        return _fallback_result(title)
 
 
 def should_include_in_feed(category: str, sentiment_score: float) -> bool:

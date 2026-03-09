@@ -14,7 +14,7 @@ AI-powered by Claude (`claude-sonnet-4-6`) for categorization, sentiment analysi
 
 ### Prerequisites
 - Docker & Docker Compose
-- An [Anthropic API key](https://console.anthropic.com/)
+- An [Anthropic API key](https://console.anthropic.com/) or a [Gemini API key](https://aistudio.google.com/)
 - Optionally: [NewsAPI key](https://newsapi.org/) and [Guardian API key](https://open-platform.theguardian.com/)
 
 ### Setup
@@ -26,7 +26,7 @@ cd news-agg
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env and fill in ANTHROPIC_API_KEY (minimum required)
+# Edit .env and fill in ANTHROPIC_API_KEY or GEMINI_API_KEY (minimum required)
 
 # 3. Start everything
 docker compose up --build
@@ -55,7 +55,7 @@ docker compose exec backend python -m pytest tests/ -v
 
 See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) for full system design and data flow.
 
-**Stack**: FastAPI + PostgreSQL + Redis (backend) · Next.js 14 + Tailwind CSS (frontend) · Claude API (AI)
+**Stack**: FastAPI + PostgreSQL + Redis (backend) · Next.js 14 + Tailwind CSS (frontend) · Claude or Gemini API (AI)
 
 ---
 
